@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roots on the Circle</title>
+<!--
+  Pilot_ComplexNumbers: interactive demo for roots of complex numbers (follows Multiplying_on_the_Plane.html).
+  View 1, z^n = 1: lengths (r = 1), the angle window (theta goes round once, so n theta goes round n times:
+  0 <= n theta < 2n pi holds exactly n whole turns 0, 2pi, ..., 2(n-1)pi, shown on two number lines), one root
+  powered round to 1, all n roots (k = n repeats k = 0), the regular polygon, conjugate pairs in -pi < theta <= pi
+  (the window -n pi < n theta <= n pi is symmetric), the formula. View 2, z^n = w: r = nth root of rho, the angle window
+  (n theta = omega + 2 pi k: exactly n values fit in 0 <= n theta < 2n pi), first root at omega/n, spacing 2pi/n, the roots of 1 turned and stretched, conjugate pairs only when w is real, the formula.
+  One self contained file, no internet needed.
+  Keys: Space or Right = next step, Left = back, 1 to 8 = n, U = z^n = 1, W = z^n = w, P = power walk,
+  L = angle range, R = restart the steps, F = full screen. Click a root to watch its powers. Drag the tip of w.
+-->
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --panel2: #1b2027;
+    --text: #e9ecef;
+    --muted: #9aa3ad;
+    --line: #2a313a;
+    --re: #3fd8ff;
+    --im: #e4c385;
+    --gold: #ffd84a;
+    --ok: #3cb371;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; height: 100%; width: 100%; }
+  #stage { position: relative; flex: 1 1 auto; min-width: 0; }
+  #cv { display: block; width: 100%; height: 100%; touch-action: none; }
+  #caption { position: absolute; left: 16px; right: 16px; bottom: 64px; pointer-events: none;
+    display: flex; justify-content: center; }
+  #caption .box { background: rgba(20, 24, 29, 0.9); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; font-size: 18px; line-height: 1.5; max-width: 880px; text-align: center; }
+  #caption .box b.step { color: var(--gold); font-weight: 600; }
+  #stepbar { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; gap: 10px;
+    justify-content: center; align-items: center; }
+  #stepbar > button { min-width: 92px; }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3a424d; cursor: pointer; border: none; padding: 0; min-width: 0; }
+  .dot.on { background: var(--gold); }
+  aside { width: 380px; flex: 0 0 380px; background: var(--panel); border-left: 1px solid var(--line);
+    overflow-y: auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 18px 0 8px; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; cursor: pointer; }
+  button:hover { border-color: #4a5563; }
+  button.on { background: #2b3440; border-color: var(--gold); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--re); outline-offset: 1px; }
+  .tabs { display: flex; gap: 8px; }
+  .tabs button { flex: 1; font-size: 16px; }
+  .nrow { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .nrow button { padding: 8px 0; font-size: 15px; }
+  .presets { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .presets button { text-align: left; }
+  .card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 15px; line-height: 1.55; }
+  .answer { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); display: none; }
+  .answer.show { display: block; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 6px 0; flex-wrap: wrap; font-size: 15px; }
+  input[type=number] { width: 76px; background: #0f1317; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px; font-size: 15px; }
+  select { background: #0f1317; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font-size: 14px; }
+  .readout { font-size: 15px; line-height: 1.8; }
+  .readout .k { color: var(--muted); }
+  table.roots { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+  table.roots th { color: var(--muted); font-weight: 500; text-align: left; padding: 4px 4px; border-bottom: 1px solid var(--line); font-size: 12px; }
+  table.roots td { padding: 5px 4px; border-bottom: 1px solid #20262e; vertical-align: middle; }
+  table.roots td.kc { font-weight: 600; }
+  .note { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 6px; }
+  i.m { font-family: "Times New Roman", Georgia, serif; font-size: 1.08em; }
+  .fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.82em; line-height: 1.08; margin: 0 1px; }
+  .fr > span:first-child { border-bottom: 1px solid currentColor; padding: 0 2px; }
+  .cg { color: var(--gold); } .cre { color: var(--re); } .cim { color: var(--im); } .cok { color: var(--ok); }
+  .help { color: var(--muted); font-size: 13px; line-height: 1.7; }
+  kbd { background: #0f1317; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  @media (max-width: 860px) {
+    #app { flex-direction: column; height: auto; }
+    #stage { height: 78vh; min-height: 420px; flex: 0 0 auto; }
+    aside { width: 100%; flex: 0 0 auto; border-left: none; border-top: 1px solid var(--line); }
+    #caption .box { font-size: 14.5px; padding: 8px 12px; }
+    #caption { bottom: 58px; left: 8px; right: 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv" aria-label="Argand plane with the roots"></canvas>
+    <div id="caption"><div class="box" id="captionText"></div></div>
+    <div id="stepbar">
+      <button id="back" title="Back (Left arrow)">&#8592; Back</button>
+      <div class="dots" id="dots"></div>
+      <button id="next" title="Next (Space or Right arrow)">Next &#8594;</button>
+    </div>
+  </div>
+  <aside>
+    <h1>Roots on the Circle</h1>
+    <p class="sub">Step through with <b>Next</b>. Click any root to watch its powers walk round the circle.</p>
+
+    <div class="tabs">
+      <button id="tabUnity" class="on"><i class="m">z</i><sup><i class="m">n</i></sup> = 1</button>
+      <button id="tabAny"><i class="m">z</i><sup><i class="m">n</i></sup> = <i class="m">w</i></button>
+    </div>
+
+    <h2>Power <i class="m" style="text-transform:none">n</i></h2>
+    <div class="nrow" id="nrow"></div>
+
+    <div id="anyBox" style="display:none">
+      <h2>Examples</h2>
+      <div class="presets" id="presets"></div>
+      <h2>The number <i class="m" style="text-transform:none">w</i></h2>
+      <div class="row"><i class="m cg">w</i> = <input type="number" id="wa" step="1"> + <input type="number" id="wb" step="1"> <i class="m">i</i></div>
+      <div class="row">length <input type="number" id="wr" step="1" min="0.1"> angle <input type="number" id="wt" step="15"> &deg;</div>
+      <div class="note">Or drag the tip of <i class="m">w</i> on the plane (it snaps to whole numbers).</div>
+    </div>
+
+    <h2>Try this</h2>
+    <div class="card">
+      <div id="tryQ"></div>
+      <button id="showAns" style="margin-top:8px">Show answer</button>
+      <div class="answer" id="tryA"></div>
+    </div>
+
+    <h2>The roots</h2>
+    <div class="readout" id="readout"></div>
+    <table class="roots" id="rootTable"></table>
+    <div class="note" id="tableNote"></div>
+
+    <h2>Settings</h2>
+    <div class="row">Angle range
+      <select id="range"><option value="02">0 &le; &theta; &lt; 2&pi;</option><option value="pm">&minus;&pi; &lt; &theta; &le; &pi;</option></select></div>
+    <div class="row"><label><input type="checkbox" id="showLabels" checked> angle labels on the plane</label></div>
+    <div class="row"><label><input type="checkbox" id="snap" checked> snap <i class="m">w</i> while dragging</label></div>
+
+    <h2>Keys</h2>
+    <div class="help">
+      <kbd>Space</kbd> / <kbd>&#8594;</kbd> next step &nbsp; <kbd>&#8592;</kbd> back &nbsp; <kbd>R</kbd> restart<br>
+      <kbd>1</kbd> to <kbd>8</kbd> choose <i class="m">n</i> &nbsp; <kbd>U</kbd> <i class="m">z<sup>n</sup></i> = 1 &nbsp; <kbd>W</kbd> <i class="m">z<sup>n</sup></i> = <i class="m">w</i><br>
+      <kbd>P</kbd> power walk &nbsp; <kbd>L</kbd> angle range &nbsp; <kbd>F</kbd> full screen
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  // ---------- complex numbers ----------
+  const C = (re, im) => ({ re, im });
+  const abs = a => Math.hypot(a.re, a.im);
+  const arg = a => Math.atan2(a.im, a.re);                 // (-pi, pi]
+  const fromPolar = (r, t) => C(r * Math.cos(t), r * Math.sin(t));
+  const conj = a => C(a.re, -a.im);
+  const PI = Math.PI, TAU = 2 * PI, EPS = 1e-9;
+  const near = (x, y, e = 1e-7) => Math.abs(x - y) < e;
+  const MINUS = "−";
+
+  function inRange(t, range) {
+    if (range === "02") { t = t % TAU; if (t < 0) t += TAU; if (near(t, TAU, 1e-9)) t = 0; return Math.max(0, t); }
+    t = t % TAU; if (t <= -PI + 1e-9) t += TAU; if (t > PI + 1e-9) t -= TAU; return t;
+  }
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }
+
+  // ---------- exact forms: x = (p/q) sqrt(m) ----------
+  const SQF = [1, 2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30, 31, 33, 34, 35, 37, 38, 39, 41, 42, 43, 46, 47];
+  function surd(x) {
+    if (Math.abs(x) < 1e-9) return { p: 0, q: 1, m: 1 };
+    for (const m of SQF) for (let q = 1; q <= 12; q++) {
+      const p = x * q / Math.sqrt(m);
+      if (Math.abs(p) < 2000 && near(p, Math.round(p), 1e-7 * Math.max(1, Math.abs(p)))) {
+        let P = Math.round(p), Q = q; const g = gcd(P, Q); P /= g; Q /= g;
+        return { p: P, q: Q, m };
+      }
+    }
+    return null;
+  }
+  function surdFmt(s, html) {
+    const neg = s.p < 0, P = Math.abs(s.p);
+    const top = s.m === 1 ? String(P) : (P === 1 ? "" : P) + "√" + s.m;
+    const sign = neg ? MINUS : "";
+    if (s.q === 1) return sign + top;
+    return html ? sign + `<span class="fr"><span>${top}</span><span>${s.q}</span></span>` : sign + top + "/" + s.q;
+  }
+  function num(x, dp = 2) {
+    const r = Math.round(x * 10 ** dp) / 10 ** dp;
+    let s = String(Math.abs(r));
+    if (r < 0 && s !== "0") s = MINUS + s;
+    return s;
+  }
+  // a + bi, exact where possible
+  function cart(z, html = true) {
+    const sa = surd(z.re), sb = surd(z.im);
+    const I = html ? '<i class="m">i</i>' : "i";
+    if (sa && sb) {
+      let out = "";
+      if (sa.p !== 0) out = surdFmt(sa, html);
+      if (sb.p !== 0) {
+        const B = { p: Math.abs(sb.p), q: sb.q, m: sb.m };
+        const coef = (B.p === 1 && B.q === 1 && B.m === 1) ? "" : surdFmt(B, html) + (B.m > 1 && B.q === 1 ? " " : "");
+        if (out === "") out = (sb.p < 0 ? MINUS : "") + coef + I;
+        else out += (sb.p < 0 ? " " + MINUS + " " : " + ") + coef + I;
+      }
+      return out === "" ? "0" : out;
+    }
+    const a = Math.round(z.re * 100) / 100, b = Math.round(z.im * 100) / 100;
+    if (b === 0) return "≈ " + num(a);
+    if (a === 0) return "≈ " + num(b) + I;
+    return "≈ " + num(a) + (b < 0 ? " " + MINUS + " " : " + ") + num(Math.abs(b)) + I;
+  }
+  // angle as a multiple of pi
+  function ang(t) {
+    if (Math.abs(t) < 1e-9) return "0";
+    const k = t / PI;
+    for (let q = 1; q <= 240; q++) {
+      const p = k * q;
+      if (near(p, Math.round(p), 1e-6)) {
+        let P = Math.round(p), Q = q; const g = gcd(P, Q); P /= g; Q /= g;
+        const sign = P < 0 ? MINUS : "";
+        return sign + (Math.abs(P) === 1 ? "π" : Math.abs(P) + "π") + (Q === 1 ? "" : "/" + Q);
+      }
+    }
+    return num(t) + " rad";
+  }
+  const SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹", SUB = "₀₁₂₃₄₅₆₇₈₉";
+  const sup = n => String(n).split("").map(d => SUP[+d]).join("");
+  const sub = n => (n < 0 ? "₋" : "") + String(Math.abs(n)).split("").map(d => SUB[+d]).join("");
+  const ROOTSIGN = { 2: "√", 3: "∛", 4: "∜" };
+  // modulus r = rho^(1/n): exact surd, or an nth root sign, or a decimal
+  function rStr(M, html = true, withApprox = true) {
+    const s = surd(M.r);
+    if (s) return surdFmt(s, html);
+    const sr = surd(M.rho);
+    let rad = "";
+    if (sr && sr.m === 1 && sr.q === 1) rad = (ROOTSIGN[M.n] || (html ? `<sup>${M.n}</sup>√` : sup(M.n) + "√")) + sr.p;
+    if (!rad) return "≈ " + num(M.r, 3);
+    return withApprox ? rad + " ≈ " + num(M.r, 3) : rad;
+  }
+  function rhoStr(M, html = true) { const s = surd(M.rho); return s ? surdFmt(s, html) : "≈ " + num(M.rho, 3); }
+  function cisStr(r1, rS, t) { return (r1 ? "" : rS + " ") + "cis(" + ang(t) + ")"; }
+
+  // ---------- examples for z^n = w ----------
+  const R3 = Math.sqrt(3);
+  const PRESETS = [
+    { name: "z³ = 8i", n: 3, w: C(0, 8),
+      q: 'Before stepping: what is the radius of the circle, and the angle of the first root?',
+      a: '|8<i class="m">i</i>| = 8, so <i class="m">r</i> = ∛8 = 2. arg 8<i class="m">i</i> = π/2, so the first root has θ = π/6: 2 cis(π/6) = √3 + <i class="m">i</i>. Adding 2π/3 each time: 2 cis(5π/6) = −√3 + <i class="m">i</i> and 2 cis(3π/2) = −2<i class="m">i</i>.' },
+    { name: "z³ = −8", n: 3, w: C(-8, 0),
+      q: 'One root is easy to spot. Which one? Where must the other two be?',
+      a: '<i class="m">z</i> = −2, since (−2)³ = −8. The other two are 2π/3 either side of it on the circle of radius 2: 2 cis(±π/3) = 1 ± √3 <i class="m">i</i>. They are a conjugate pair, because −8 is real.' },
+    { name: "z⁴ = −16", n: 4, w: C(-16, 0),
+      q: 'Find the four roots in the form <i class="m">a</i> + <i class="m">bi</i>.',
+      a: '<i class="m">r</i> = ∜16 = 2, ω = π, so θ = π/4 + <i class="m">k</i>π/2. Roots: √2 + √2 <i class="m">i</i>, −√2 + √2 <i class="m">i</i>, −√2 − √2 <i class="m">i</i>, √2 − √2 <i class="m">i</i>: a square, two conjugate pairs.' },
+    { name: "z² = i", n: 2, w: C(0, 1),
+      q: 'Find both square roots of <i class="m">i</i>. Why are the two square roots of any number always opposite each other?',
+      a: '<i class="m">r</i> = 1 and θ = π/4 + <i class="m">k</i>π: cis(π/4) = √2/2 + (√2/2)<i class="m">i</i> and its negative. The spacing is 2π/2 = π, half a turn, so the roots are always <i class="m">z</i> and −<i class="m">z</i>.' },
+    { name: "z⁴ = −8 − 8√3 i", n: 4, w: C(-8, -8 * R3),
+      q: 'Find |<i class="m">w</i>| and arg <i class="m">w</i> in your angle range, then all four roots. Are they conjugate pairs?',
+      a: '|<i class="m">w</i>| = √(64 + 192) = 16, so <i class="m">r</i> = 2. arg <i class="m">w</i> = −2π/3 (or 4π/3). θ = −π/6 + <i class="m">k</i>π/2: √3 − <i class="m">i</i>, 1 + √3 <i class="m">i</i>, −√3 + <i class="m">i</i>, −1 − √3 <i class="m">i</i>. Not conjugate pairs: <i class="m">w</i> is not real.' },
+    { name: "z⁶ = −64", n: 6, w: C(-64, 0),
+      q: 'Why does this hexagon have no corner on the real axis?',
+      a: '<i class="m">r</i> = 2 and θ = π/6 + <i class="m">k</i>π/3: π/6, π/2, 5π/6, 7π/6, 3π/2, 11π/6. None is 0 or π. A real root <i class="m">x</i> would need <i class="m">x</i>⁶ = −64, impossible since <i class="m">x</i>⁶ ≥ 0. The roots ±√3 ± <i class="m">i</i>, ±2<i class="m">i</i> come in conjugate pairs.' },
+  ];
+
+  // ---------- "Try this" for z^n = 1 ----------
+  const TRY_UNITY = {
+    1: { q: 'θ = 2π<i class="m">k</i> solves cis θ = 1 for every whole number <i class="m">k</i>. So why does <i class="m">z</i>¹ = 1 have only one root?',
+         a: 'θ = 0, 2π, 4π, ... are all the same point on the circle. Inside 0 ≤ θ &lt; 2π only <i class="m">k</i> = 0 fits, so the only root is <i class="m">z</i> = 1.' },
+    2: { q: 'Square cis π. Why does it land on 1?',
+         a: '(cis π)² = cis 2π: the angle doubles to one full turn. So <i class="m">z</i>² = 1 has the roots cis 0 = 1 and cis π = −1.' },
+    3: { q: 'Write the three cube roots of 1 in the form <i class="m">a</i> + <i class="m">bi</i>. Which two are conjugates?',
+         a: '1, −1/2 + (√3/2)<i class="m">i</i>, −1/2 − (√3/2)<i class="m">i</i>. In −π &lt; θ ≤ π their angles are 0, 2π/3, −2π/3, so the last two are a conjugate pair.' },
+    4: { q: 'Find the four roots of <i class="m">z</i>⁴ = 1 without the formula. Hint: factorise <i class="m">z</i>⁴ − 1.',
+         a: '<i class="m">z</i>⁴ − 1 = (<i class="m">z</i>² − 1)(<i class="m">z</i>² + 1) = (<i class="m">z</i> − 1)(<i class="m">z</i> + 1)(<i class="m">z</i> − <i class="m">i</i>)(<i class="m">z</i> + <i class="m">i</i>), so <i class="m">z</i> = 1, <i class="m">i</i>, −1, −<i class="m">i</i>: angles 0, π/2, π, 3π/2.' },
+    5: { q: 'Use −π &lt; θ ≤ π: write the five roots as cis θ with <i class="m">k</i> = 0, ±1, ±2. Which pairs are conjugates?',
+         a: 'cis 0 = 1, cis(±2π/5), cis(±4π/5). The pairs <i class="m">k</i> = ±1 and <i class="m">k</i> = ±2 are conjugates; 1 is real and pairs with itself.' },
+    6: { q: 'Which sixth roots of 1 are also cube roots of 1? Explain with angles.',
+         a: 'The angles are 0, π/3, 2π/3, π, 4π/3, 5π/3. Tripling must give a multiple of 2π: only 0, 2π/3, 4π/3 work. They are every second corner of the hexagon.' },
+    8: { q: '<i class="m">z</i>⁸ = 1: how many real roots, and how many conjugate pairs?',
+         a: 'Real: 1 and −1 (angles 0 and π). The other six make three conjugate pairs: cis(±π/4), cis(±π/2) = ±<i class="m">i</i>, cis(±3π/4).' },
+  };
+  function tryUnity(n) {
+    if (TRY_UNITY[n]) return TRY_UNITY[n];
+    const real = n % 2 === 0 ? 2 : 1, pairs = (n - real) / 2;
+    return { q: `How many of the ${n} roots of <i class="m">z</i><sup>${n}</sup> = 1 are real, and how many conjugate pairs are there?`,
+             a: `Real: ${n % 2 === 0 ? "1 and −1" : "only 1"}. The other ${n - real} roots make ${pairs} conjugate pairs, cis(±2π<i class="m">k</i>/${n}).` };
+  }
+
+  // ---------- state ----------
+  const S = {
+    mode: "unity", n: 3, w: C(0, 8), preset: 0, custom: false, range: "02", labels: true, snap: true,
+    step: 0, stepT: 1, walk: null, sel: 1, scale: 120, targetScale: 120, drag: false, frozen: false,
+  };
+  // the steps of each view, by id (the two views have different steps)
+  const STEPS = {
+    unity: ["question", "lengths", "window", "walk", "all", "polygon", "conj", "formula"],
+    any: ["question", "lengths", "window", "walk", "all", "turn", "conj", "formula"],
+  };
+  const STEP_NAMES = {
+    unity: { question: "The question", lengths: "Lengths", window: "Why n roots: the angle window", walk: "One root, powered",
+             all: "All the roots", polygon: "Regular polygon", conj: "Conjugate pairs", formula: "The formula" },
+    any: { question: "The question", lengths: "Lengths", window: "Why n roots: the angle window", walk: "The first root", all: "All the roots", turn: "Turn and stretch",
+           conj: "Conjugate pairs?", formula: "The formula" },
+  };
+  const nSteps = () => STEPS[S.mode].length;
+  const sid = () => STEPS[S.mode][S.step];
+  const stepIdx = id => STEPS[S.mode].indexOf(id);
+  const after = id => stepIdx(id) >= 0 && S.step >= stepIdx(id);      // at this step or later
+
+  // ---------- the model ----------
+  function model() {
+    const n = S.n;
+    const w = S.mode === "unity" ? C(1, 0) : S.w;
+    const rho = abs(w);
+    const omega = inRange(arg(w), S.range);
+    const r = Math.pow(rho, 1 / n);
+    const roots = [];
+    for (let k = 0; k < n; k++) { const th = (omega + TAU * k) / n; roots.push({ k, th, z: fromPolar(r, th) }); }
+    const wReal = Math.abs(w.im) < 1e-9;
+    return { n, w, rho, omega, r, roots, wReal, r1: near(r, 1, 1e-9) };
+  }
+  const labelRange = () => (sid() === "conj" ? "pm" : S.range);
+  // k as named in range L: theta_L = (omega_L + 2 pi k) / n
+  function kIn(M, th, L) {
+    const tL = inRange(th, L), wL = inRange(arg(M.w), L);
+    return Math.round((M.n * tL - wL) / TAU);
+  }
+
+  // ---------- elements ----------
+  const $ = id => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d");
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const COLORS = ["#3fd8ff", "#ff9f43", "#b487ff", "#3cb371", "#ff6b8b", "#5ad1b0", "#e48bff", "#9ad04a", "#7aa7ff", "#ff8a5c", "#f0a0c0", "#c8e06a"];
+  const GOLD = "#ffd84a";
+  const col = k => COLORS[((k % COLORS.length) + COLORS.length) % COLORS.length];
+
+  // ---------- layout ----------
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    DPR = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fit(true);
+  }
+  // room for the caption and the step buttons, measured from the caption box
+  const reserve = () => { const b = $("captionText"); return (b ? b.offsetHeight : 60) + (W < 600 ? 74 : 82); };
+  // room at the top for the two number lines (theta and n theta) in the z^n = 1 window and conjugate steps
+  const showStrip = () => sid() === "window" || sid() === "conj";
+  const topReserve = () => (showStrip() ? 108 : 0);
+  const cx = () => W / 2, cy = () => topReserve() + (H - reserve() - topReserve()) / 2 + 10;
+  const toS = p => ({ x: cx() + p.re * S.scale, y: cy() - p.im * S.scale });
+  const toW = (x, y) => C((x - cx()) / S.scale, (cy() - y) / S.scale);
+  function fit(now) {
+    if (S.frozen) return;
+    const M = model();
+    let ext;
+    if (S.mode === "unity") ext = 1.5;
+    else if (sid() === "question") ext = Math.max(M.rho, M.r, 1) * 1.2;
+    else {
+      ext = Math.max(M.r, sid() === "turn" ? 1 : 0, M.rho <= 2.6 * M.r ? M.rho : 0) * 1.42;
+    }
+    const usable = Math.min(W - 40, H - reserve() - topReserve() - 30);
+    S.targetScale = Math.max(0.3, usable / 2 / ext);
+    if (now || reduceMotion) S.scale = S.targetScale;
+  }
+  function niceStep() {
+    const units = Math.min(W, H - reserve()) / S.scale;
+    for (const st of [0.5, 1, 2, 5, 10, 20, 50]) if (units / st <= 12) return st;
+    return 100;
+  }
+
+  // ---------- drawing helpers ----------
+  function line(a, b, color, width, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
+  }
+  function halo(text, x, y, color, font = "16px system-ui, sans-serif", align = "center") {
+    ctx.save(); ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle";
+    ctx.lineWidth = 5; ctx.strokeStyle = "rgba(11,13,16,0.92)"; ctx.strokeText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore();
+  }
+  function dot(p, color, r = 6) {
+    const s = toS(p); ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill(); ctx.restore();
+  }
+  function ring(p, color, r = 10, width = 2, dash) {
+    const s = toS(p); ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.stroke(); ctx.restore();
+  }
+  function arrowS(a, b, color, width = 3) {
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+    if (L < 2) return;
+    const ux = dx / L, uy = dy / L, head = Math.min(15, L * 0.4);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x - ux * head * 0.8, b.y - uy * head * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - ux * head - uy * head * 0.45, b.y - uy * head + ux * head * 0.45);
+    ctx.lineTo(b.x - ux * head + uy * head * 0.45, b.y - uy * head - ux * head * 0.45);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  // arc around the origin, radius in pixels, maths angles
+  function arcPx(rad, t0, t1, color, width = 2.5, head = true) {
+    const o = toS(C(0, 0));
+    if (Math.abs(t1 - t0) < 1e-6) return;
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.arc(o.x, o.y, rad, -t0, -t1, t1 > t0); ctx.stroke();
+    if (head && Math.abs(t1 - t0) * rad > 14) {
+      const dir = t1 > t0 ? 1 : -1, ex = o.x + rad * Math.cos(t1), ey = o.y - rad * Math.sin(t1);
+      const tx = -Math.sin(t1) * dir, ty = -Math.cos(t1) * dir;
+      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - tx * 10 - ty * 5, ey - ty * 10 + tx * 5);
+      ctx.lineTo(ex - tx * 10 + ty * 5, ey - ty * 10 - tx * 5);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function axes() {
+    const st = niceStep();
+    const xmax = (W / 2) / S.scale + st, ymax = (H / 2) / S.scale + st;
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 1;
+    for (let k = -Math.ceil(xmax / st) * st; k <= xmax; k += st) { const a = toS(C(k, -ymax)), b = toS(C(k, ymax)); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    for (let k = -Math.ceil(ymax / st) * st; k <= ymax; k += st) { const a = toS(C(-xmax, k)), b = toS(C(xmax, k)); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    ctx.restore();
+    const realGlow = sid() === "conj";
+    line(toS(C(-xmax, 0)), toS(C(xmax, 0)), realGlow ? "rgba(63,216,255,1)" : "rgba(63,216,255,0.7)", realGlow ? 3.5 : 2);
+    line(toS(C(0, -ymax)), toS(C(0, ymax)), "rgba(228,195,133,0.7)", 2);
+    ctx.save(); ctx.font = "13px system-ui, sans-serif"; ctx.fillStyle = "rgba(233,236,239,0.55)"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let k = -Math.ceil(xmax / st) * st; k <= xmax; k += st) {
+      if (Math.abs(k) < 1e-9) continue; const p = toS(C(k, 0)); ctx.fillText(num(k), p.x, p.y + 5);
+    }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let k = -Math.ceil(ymax / st) * st; k <= ymax; k += st) {
+      if (Math.abs(k) < 1e-9) continue; const p = toS(C(0, k)); ctx.fillText(num(k) + "i", p.x - 6, p.y);
+    }
+    ctx.restore();
+    const e = toS(C(xmax - st * 0.6, 0)), n = toS(C(0, ymax - st * 0.6));
+    halo("Re", Math.min(e.x, W - 22), e.y - 14, "rgba(63,216,255,0.9)", "14px system-ui, sans-serif");
+    halo("Im", n.x + 20, Math.max(n.y, 16), "rgba(228,195,133,0.9)", "14px system-ui, sans-serif");
+  }
+
+  // ---------- pieces of the picture ----------
+  function drawTarget(M) {
+    if (S.mode === "unity") {
+      const p = toS(C(1, 0));
+      ring(C(1, 0), GOLD, 11, 2.5); dot(C(1, 0), GOLD, 5);
+      if (!after("all") && sid() !== "window") halo("1", p.x + 16, p.y + 18, GOLD, "bold 18px system-ui, sans-serif");
+      return;
+    }
+    const o = toS(C(0, 0)), p = toS(M.w), m = 24;
+    const inside = p.x > m && p.x < W - m && p.y > m && p.y < H - reserve() + 10;
+    if (inside) {
+      arrowS(o, p, GOLD, 3.5);
+      ring(M.w, GOLD, 11, 2);
+      const u = { x: (p.x - o.x) / Math.max(1, Math.hypot(p.x - o.x, p.y - o.y)), y: (p.y - o.y) / Math.max(1, Math.hypot(p.x - o.x, p.y - o.y)) };
+      halo("w", p.x + u.x * 22 + u.y * 14, p.y + u.y * 22 - u.x * 14, GOLD, "italic bold 22px 'Times New Roman', Georgia, serif");
+    } else {
+      // w is off screen: draw its direction to the edge
+      const t = arg(M.w), dx = Math.cos(t), dy = -Math.sin(t);
+      let s = Infinity;
+      if (dx > 1e-9) s = Math.min(s, (W - m - o.x) / dx); if (dx < -1e-9) s = Math.min(s, (m - o.x) / dx);
+      if (dy > 1e-9) s = Math.min(s, (H - reserve() + 10 - o.y) / dy); if (dy < -1e-9) s = Math.min(s, (m - o.y) / dy);
+      const e = { x: o.x + dx * s, y: o.y + dy * s };
+      ctx.save(); ctx.setLineDash([8, 6]); arrowS(o, e, "rgba(255,216,74,0.85)", 2.5); ctx.restore();
+      halo("w", e.x - dx * 18 - dy * 16, e.y - dy * 18 + dx * 16, GOLD, "italic bold 22px 'Times New Roman', Georgia, serif");
+      halo("w is off the screen: |w| = " + (surd(M.rho) ? surdFmt(surd(M.rho), false) : num(M.rho)) + ", arg w = " + ang(inRange(arg(M.w), labelRange())) + " (dashed arrow)",
+        14, topReserve() + 18, GOLD, "15px system-ui, sans-serif", "left");
+    }
+  }
+  function drawCircle(M) {
+    const o = toS(C(0, 0)), R = M.r * S.scale;
+    const lens = sid() === "lengths", t = lens ? ease(S.stepT) : 1;
+    ctx.save();
+    ctx.strokeStyle = lens ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.32)";
+    ctx.lineWidth = lens ? 2.5 : 1.5; if (!lens) ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, -TAU * t, true); ctx.stroke(); ctx.restore();
+    if (lens) {
+      const a = 2.3, e = { x: o.x + R * Math.cos(a), y: o.y - R * Math.sin(a) };
+      line(o, e, "rgba(255,255,255,0.7)", 2, [4, 4]);
+      halo("r = " + rStr(M, false, false), (o.x + e.x) / 2 - 30, (o.y + e.y) / 2 - 8, "#ffffff", "italic 18px 'Times New Roman', Georgia, serif");
+    }
+  }
+  function rootLabel(M, root, L, color, big) {
+    const s = toS(root.z), o = toS(C(0, 0));
+    let ux = s.x - o.x, uy = s.y - o.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
+    const k = kIn(M, root.th, L);
+    const off = big ? 30 : 26;
+    halo("z" + sub(k), s.x + ux * off, s.y + uy * off - (S.labels && M.n <= 8 ? 8 : 0), color, "italic bold 19px 'Times New Roman', Georgia, serif");
+    if (S.labels && M.n <= 8) halo("θ = " + ang(inRange(root.th, L)), s.x + ux * off, s.y + uy * off + 11, color, "13.5px system-ui, sans-serif");
+  }
+  function drawPolygon(M, roots, color, width, dash) {
+    if (roots.length < 2) return;
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    roots.forEach((z, i) => { const s = toS(z); if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y); });
+    if (roots.length > 2) ctx.closePath();
+    ctx.stroke(); ctx.restore();
+  }
+  function drawGaps(M) {
+    // spokes, the equal angle 2pi/n between neighbours, and the equal side
+    const o = toS(C(0, 0)), n = M.n;
+    if (n < 2) return;
+    M.roots.forEach(rt => line(o, toS(rt.z), "rgba(255,255,255,0.22)", 1.5));
+    const R = M.r * S.scale, rad = Math.min(46, R * 0.32);
+    for (let k = 0; k < n; k++) arcPx(rad + (k % 2) * 6, M.roots[k].th, M.roots[k].th + TAU / n, "rgba(255,216,74,0.55)", 2, false);
+    const mid = M.roots[0].th + PI / n;
+    halo(ang(TAU / n), o.x + (rad + 24) * Math.cos(mid), o.y - (rad + 24) * Math.sin(mid), GOLD, "bold 15px system-ui, sans-serif");
+    if (n >= 3) {
+      const a = toS(M.roots[0].z), b = toS(M.roots[1].z);
+      const side = 2 * M.r * Math.sin(PI / n), ss = surd(side);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const ox = mx - o.x, oy = my - o.y, d = Math.hypot(ox, oy) || 1;
+      halo("side " + (ss ? surdFmt(ss, false) : "≈ " + num(side)), mx + ox / d * 34, my + oy / d * 20, "#ffffff", "14px system-ui, sans-serif");
+    }
+  }
+  function drawConj(M) {
+    const L = "pm";
+    if (S.mode === "unity" || M.wReal) {
+      M.roots.forEach(rt => {
+        if (rt.z.im > 1e-9) {
+          const mate = M.roots.find(q => near(q.z.re, rt.z.re, 1e-7) && near(q.z.im, -rt.z.im, 1e-7));
+          if (mate) line(toS(rt.z), toS(mate.z), "rgba(255,255,255,0.55)", 1.8, [5, 5]);
+        }
+        if (Math.abs(rt.z.im) < 1e-9) ring(rt.z, "#3fd8ff", 15, 2.5);
+      });
+    } else {
+      M.roots.forEach(rt => {
+        const c = conj(rt.z);
+        line(toS(rt.z), toS(c), "rgba(255,255,255,0.3)", 1.5, [4, 5]);
+        ring(c, "rgba(200,205,212,0.85)", 7, 2);
+      });
+      const ws = toS(conj(M.w));
+      if (ws.x > 20 && ws.x < W - 20 && ws.y > 20 && ws.y < H - reserve()) {
+        ring(conj(M.w), "rgba(255,216,74,0.6)", 9, 2, [3, 3]);
+        halo("w*", ws.x + 20, ws.y + 16, "rgba(255,216,74,0.85)", "italic 18px 'Times New Roman', Georgia, serif");
+      }
+    }
+  }
+  // the powers of one root, z, z^2, ..., z^n: angles theta, 2 theta, ..., n theta (directions on the root circle)
+  function drawWalk(M) {
+    const wk = S.walk; if (!wk) return;
+    const root = M.roots[wk.k]; if (!root) return;
+    const o = toS(C(0, 0)), R = M.r * S.scale, color = col(wk.k), th = root.th;
+    const t = Math.min(wk.t, M.n), phi = t * th;
+    // spiral of the total angle turned so far
+    const base = Math.max(26, Math.min(R * 0.42, 70)), grow = Math.min(12, R * 0.06);
+    const steps = Math.max(2, Math.ceil(Math.abs(phi) / 0.03));
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const a = phi * i / steps, rr = base + grow * Math.abs(a) / TAU;
+      const x = o.x + rr * Math.cos(a), y = o.y - rr * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke(); ctx.restore();
+    // powers reached so far
+    for (let j = 1; j <= Math.floor(t + 1e-9); j++) {
+      const p = fromPolar(M.r, j * th), s = toS(p);
+      ring(p, color, 8, 2);
+      const ux = (s.x - o.x) / R, uy = (s.y - o.y) / R;
+      halo("z" + sub(kIn(M, th, labelRange())) + sup(j), s.x - ux * 24, s.y - uy * 24, color, "italic 15px 'Times New Roman', Georgia, serif");
+    }
+    // moving point
+    const cur = fromPolar(M.r, phi), cs = toS(cur);
+    line(o, cs, color, 1.5, [3, 4]);
+    dot(cur, color, 7);
+    if (wk.t >= M.n) {
+      const end = fromPolar(M.r, M.n * th);
+      ring(end, "#ffffff", 16, 2.5);
+    }
+  }
+  // ---------- the angle window ----------
+  // theta goes round once, so n theta goes round n times. z^n = rho cis(omega) needs n theta = omega + 2 pi k:
+  // exactly n of these values fit inside the window (for z^n = 1, omega = 0 and they are the whole turns)
+  const windowSeconds = n => 2.2 + 1.1 * n;
+  const windowStart = L => (L === "02" ? 0 : -PI);
+  // the k with n theta = omega + 2 pi k inside 0 <= n theta < 2n pi, or -n pi < n theta <= n pi
+  function windowTurns(n, L, om) {
+    const ks = [];
+    for (let k = -n - 1; k <= n + 1; k++) {
+      const v = om + TAU * k;
+      if (L === "02" ? (v > -1e-9 && v < TAU * n - 1e-9) : (v > -PI * n + 1e-9 && v < PI * n + 1e-9)) ks.push(k);
+    }
+    return ks;
+  }
+  const baseK = (k, n) => ((k % n) + n) % n;              // the same colour as that root in the later steps
+  function drawWindowCircle(M, u) {
+    const n = M.n, L = S.range, om = M.omega, t0 = windowStart(L), th = t0 + u * TAU;
+    const o = toS(C(0, 0)), R = M.r * S.scale;
+    // the roots found so far: every time z^n points along w
+    windowTurns(n, L, om).forEach(k => {
+      const tk = (om + TAU * k) / n;
+      if (th >= tk - 1e-9) {
+        const z = fromPolar(M.r, tk), s = toS(z), c = col(baseK(k, n));
+        dot(z, c, 8);
+        const ux = (s.x - o.x) / R, uy = (s.y - o.y) / R;
+        if (S.labels && n <= 8) halo("θ = " + ang(tk), s.x + ux * 30, s.y + uy * 26, c, "13.5px system-ui, sans-serif");
+      }
+    });
+    // theta: one turn (white arc); n theta: n turns (gold spiral)
+    arcPx(R * 0.16, t0, th, "rgba(255,255,255,0.8)", 2, true);
+    const base = R * 0.24, grow = Math.min(9, R * 0.05), a0 = n * t0, a1 = n * th;
+    const steps = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 0.03));
+    ctx.save(); ctx.strokeStyle = "rgba(255,216,74,0.85)"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const a = a0 + (a1 - a0) * i / steps, rr = base + grow * Math.abs(a - a0) / TAU;
+      const x = o.x + rr * Math.cos(a), y = o.y - rr * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke(); ctx.restore();
+    // the two moving points (hidden once the sweep is done: the end of the window is left out)
+    if (u >= 1) return;
+    // z^n has length rho: drawn there when w is on the screen, otherwise only its direction, on the roots' circle
+    const trueLen = S.mode === "unity" || M.rho <= 2.6 * M.r, Rn = trueLen ? M.rho : M.r;
+    if (S.mode === "any" && trueLen && !near(M.rho, M.r, 1e-9)) {
+      ctx.save(); ctx.strokeStyle = "rgba(255,216,74,0.28)"; ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(o.x, o.y, M.rho * S.scale, 0, TAU); ctx.stroke(); ctx.restore();
+    }
+    const z = fromPolar(M.r, th), zn = fromPolar(Rn, n * th), zs = toS(z), ns = toS(zn);
+    line(o, zs, "rgba(255,255,255,0.6)", 1.5, [3, 4]);
+    dot(z, "#ffffff", 6);
+    halo("z", zs.x + (zs.x - o.x) / R * 18, zs.y + (zs.y - o.y) / R * 18, "#ffffff", "italic bold 19px 'Times New Roman', Georgia, serif");
+    if (n > 1) {
+      const Rpx = Rn * S.scale;
+      ring(zn, GOLD, 12, 2.5);
+      halo("z" + sup(n) + (trueLen ? "" : " (direction)"), ns.x - (ns.x - o.x) / Rpx * 34, ns.y - (ns.y - o.y) / Rpx * 30, GOLD, "italic bold 18px 'Times New Roman', Georgia, serif");
+    }
+  }
+  // two number lines: theta across its window, n theta across n times the window, lined up so theta and n theta match
+  function drawStrip(n, L, u, cursor, om) {
+    const narrow = W < 600, x0 = narrow ? 52 : 70, x1 = W - (narrow ? 22 : 44), Lw = x1 - x0;
+    const top = 8, y1 = top + 38, y2 = top + 76, t0 = windowStart(L);
+    const X = th => x0 + (th - t0) / TAU * Lw;
+    ctx.save();
+    ctx.fillStyle = "rgba(20,24,29,0.92)"; ctx.strokeStyle = "#2a313a"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - (narrow ? 46 : 60), top, Lw + (narrow ? 60 : 84), 96, 10) : ctx.rect(x0 - 60, top, Lw + 84, 96);
+    ctx.fill(); ctx.stroke(); ctx.restore();
+    line({ x: x0, y: y1 }, { x: x1, y: y1 }, "rgba(255,255,255,0.85)", 2);
+    line({ x: x0, y: y2 }, { x: x1, y: y2 }, "rgba(255,216,74,0.9)", 2);
+    const f13 = "13px system-ui, sans-serif", fRow = "italic bold 18px 'Times New Roman', Georgia, serif";
+    halo("θ", x0 - (narrow ? 26 : 34), y1, "#ffffff", fRow);
+    halo((n === 1 ? "" : n) + "θ", x0 - (narrow ? 26 : 34), y2, GOLD, fRow);
+    // end points: 0 included and 2 pi excluded, or -pi excluded and pi included
+    const endPt = (x, y, open, color) => {
+      ctx.save(); ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU);
+      if (open) { ctx.fillStyle = "#14181d"; ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }
+      else { ctx.fillStyle = color; ctx.fill(); }
+      ctx.restore();
+    };
+    const ks = windowTurns(n, L, om), th = t0 + u * TAU;
+    const startOpen = L !== "02", endOpen = L === "02";
+    // every candidate omega + 2 pi k on the n theta line, including one that falls on an excluded end
+    for (let k = -n - 1; k <= n + 1; k++) {
+      const x = X((om + TAU * k) / n);
+      if (x < x0 - 1 || x > x1 + 1) continue;
+      line({ x, y: y2 - 6 }, { x, y: y2 + 6 }, "rgba(255,216,74,0.6)", 1.5);
+    }
+    endPt(x0, y1, startOpen, "#ffffff"); endPt(x1, y1, endOpen, "#ffffff");
+    endPt(x0, y2, startOpen, GOLD); endPt(x1, y2, endOpen, GOLD);
+    // end labels that are not also a root (or too close to one to fit)
+    const markXs = ks.map(k => X((om + TAU * k) / n));
+    const clear = x => markXs.every(mx => Math.abs(mx - x) > 30);
+    if (clear(x0)) { halo(ang(t0), x0, y1 - 16, "rgba(255,255,255,0.75)", f13); halo(ang(n * t0), x0, y2 + 17, "rgba(255,216,74,0.8)", f13); }
+    if (clear(x1)) { halo(ang(t0 + TAU), x1, y1 - 16, "rgba(255,255,255,0.75)", f13); halo(ang(n * (t0 + TAU)), x1, y2 + 17, "rgba(255,216,74,0.8)", f13); }
+    // the values inside the window and the matching theta
+    ks.forEach(k => {
+      const v = om + TAU * k, tk = v / n, x = X(tk), on = th >= tk - 1e-9, c = on ? col(baseK(k, n)) : "rgba(154,163,173,0.55)";
+      line({ x, y: y1 }, { x, y: y2 }, on ? c : "rgba(154,163,173,0.3)", 1.5, [3, 3]);
+      ctx.save(); ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x, y1, 5, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(x, y2, 5, 0, TAU); ctx.fill(); ctx.restore();
+      halo(ang(tk), x, y1 - 16, c, f13);
+      halo(ang(v), x, y2 + 17, c, f13);
+    });
+    if (cursor) {
+      const x = X(Math.min(th, t0 + TAU));
+      line({ x, y: y1 - 9 }, { x, y: y2 + 9 }, "#ffffff", 2);
+    }
+  }
+  function windowCaption(M) {
+    const n = M.n, L = S.range, om = M.omega, ks = windowTurns(n, L, om);
+    const vals = ks.map(k => ang(om + TAU * k)), thetas = ks.map(k => ang((om + TAU * k) / n));
+    const show = a => (a.length <= 6 ? a.join(", ") : a.slice(0, 3).join(", ") + ", ..., " + a[a.length - 1]);
+    const win = L === "02" ? "0 ≤ θ &lt; 2π" : "−π &lt; θ ≤ π";
+    const nwin = L === "02" ? `0 ≤ ${n}θ &lt; ${ang(TAU * n)}` : `−${ang(PI * n)} &lt; ${n}θ ≤ ${ang(PI * n)}`;
+    if (S.mode === "unity") {
+      if (n === 1) return `θ goes round once, ${win}. cis θ = 1 only at θ = 0 (θ = 2π is the same point, and it is outside the window). One root.`;
+      if (L === "02") return `θ goes round once, ${win}, so ${n}θ goes round ${n} times: ${nwin}. ` +
+        `cis(${n}θ) = 1 at every whole turn in this window: ${n}θ = ${show(vals)} (${ang(TAU * n)} is left out). ` +
+        `That is ${n} values, so ${n} roots: θ = ${show(thetas)}.`;
+      return `θ goes round once, ${win}, so ${nwin}. ` +
+        `Whole turns in this window: ${n}θ = ${show(vals)}${n % 2 === 0 ? " (−" + ang(PI * n) + " is left out: it gives θ = −π, the same point as π)" : ""}. That is ${n} values, so ${n} roots: θ = ${show(thetas)}.`;
+    }
+    const w0 = ang(om);
+    if (n === 1) return `θ goes round once, ${win}. cis θ = cis(${w0}) only at θ = ${w0}. One root: ${zi} = ${wi}.`;
+    // the first candidate past the window, to show why the list stops
+    const past = L === "02" ? ang(om + TAU * n) : null;
+    return `θ goes round once, ${win}, so ${n}θ goes round ${n} times: ${nwin}. ` +
+      `We need cis(${n}θ) = cis(${w0}), so ${n}θ = ${w0} plus whole turns: ${n}θ = ${show(vals)}` +
+      (past ? ` (the next one, ${past}, is past ${ang(TAU * n)})` : "") +
+      `. That is ${n} values, so ${n} roots: θ = ${show(thetas)}.`;
+  }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; }
+
+  function draw() {
+    const M = model();
+    ctx.fillStyle = "#0b0d10"; ctx.fillRect(0, 0, W, H);
+    axes();
+    if (after("lengths")) drawCircle(M);
+    drawTarget(M);
+    const L = labelRange();
+    if (sid() === "window") { drawWindowCircle(M, S.stepT); drawStrip(M.n, S.range, S.stepT, true, M.omega); }
+    if (sid() === "conj") drawStrip(M.n, "pm", 1, false, inRange(arg(M.w), "pm"));
+
+    // step 4 in z^n = w: the roots of 1 (faint) turned by omega/n and stretched by r
+    if (sid() === "turn") {
+      const u = ease(S.stepT), n = M.n, th0 = M.roots[0].th;
+      const unit = [], moving = [];
+      for (let k = 0; k < n; k++) { unit.push(fromPolar(1, TAU * k / n)); moving.push(fromPolar(1 + (M.r - 1) * u, TAU * k / n + th0 * u)); }
+      drawPolygon(M, unit, "rgba(255,255,255,0.35)", 1.5, [4, 5]);
+      unit.forEach(z => ring(z, "rgba(255,255,255,0.45)", 5, 1.5));
+      const us = toS(unit[0]); halo("roots of 1", us.x + 44, us.y - 14, "rgba(255,255,255,0.65)", "13px system-ui, sans-serif");
+      drawPolygon(M, moving, "rgba(255,216,74,0.9)", 2.5);
+      moving.forEach(z => dot(z, "rgba(255,216,74,0.9)", 4));
+      if (n >= 1) arcPx(Math.min(54, M.r * S.scale * 0.36), 0, th0 * u, GOLD, 2.5, true);
+    }
+    if (sid() === "polygon" || sid() === "formula") drawPolygon(M, M.roots.map(r => r.z), "rgba(255,255,255,0.75)", 2.2);
+    if (sid() === "polygon") drawGaps(M);
+    if (sid() === "conj") { drawPolygon(M, M.roots.map(r => r.z), "rgba(255,255,255,0.25)", 1.5); drawConj(M); }
+
+    // roots
+    if (sid() === "walk") {
+      const k = S.walk ? S.walk.k : S.sel, rt = M.roots[k];
+      if (rt) { dot(rt.z, col(k), 8); rootLabel(M, rt, L, col(k), true); }
+    } else if (after("all")) {
+      const shown = sid() === "all" ? Math.min(M.n + 1, Math.floor(S.stepT * (M.n + 1) + 1e-9) + 1) : M.n;
+      for (let i = 0; i < Math.min(shown, M.n); i++) { dot(M.roots[i].z, col(i), 8); rootLabel(M, M.roots[i], L, col(i)); }
+      if (sid() === "all" && shown > M.n) {
+        const z0 = M.roots[0], th = (M.omega + TAU * M.n) / M.n, s = toS(z0.z);
+        ring(z0.z, "#ffffff", 17, 2, [4, 4]);
+        const o = toS(C(0, 0)), d = Math.hypot(s.x - o.x, s.y - o.y) || 1;
+        halo("k = " + M.n + " (θ = " + ang(th) + ")", s.x - (s.x - o.x) / d * 62, s.y - (s.y - o.y) / d * 30 - 10, "#ffffff", "14px system-ui, sans-serif");
+        halo("same point as k = 0", s.x - (s.x - o.x) / d * 62, s.y - (s.y - o.y) / d * 30 + 8, "#ffffff", "14px system-ui, sans-serif");
+      }
+    }
+    drawWalk(M);
+  }
+
+  // ---------- captions ----------
+  const zi = '<i class="m">z</i>', ri = '<i class="m">r</i>', ni = '<i class="m">n</i>', ki = '<i class="m">k</i>', wi = '<i class="m">w</i>';
+  function caption() {
+    const M = model(), n = M.n, step = S.step, id = sid(), name = STEP_NAMES[S.mode][id];
+    const head = `<b class="step">${step + 1}. ${name}${name.endsWith("?") ? "" : "."}</b> `;
+    const gap = ang(TAU / n);
+    const rangeTxt = S.range === "02" ? "0 ≤ θ &lt; 2π" : "−π &lt; θ ≤ π";
+    if (S.mode === "unity") {
+      switch (id) {
+        case "question": return head + `Solve ${zi}<sup>${n}</sup> = 1. Write ${zi} = ${ri} cis θ. Which points land exactly on <b class="cg">1</b> when raised to the power ${n}?`;
+        case "lengths": return head + `De Moivre: ${zi}<sup>${n}</sup> = ${ri}<sup>${n}</sup> cis(${n}θ) = 1 cis 0. Lengths: ${ri}<sup>${n}</sup> = 1 and ${ri} &gt; 0, so ${ri} = 1. Every root lies on the unit circle.`;
+        case "window": return head + windowCaption(M);
+        case "walk": {
+          if (n === 1) return head + `cis θ = cis 0 means θ = 0 + 2π${ki}. In ${rangeTxt} only θ = 0 works: ${zi} = 1 is the only root.`;
+          const done = S.walk && S.walk.t >= n;
+          const k = S.walk ? S.walk.k : 1, th = M.roots[k] ? M.roots[k].th : TAU / n;
+          return head + `Angles: cis(${n}θ) = cis 0 means ${n}θ = 0 + 2π${ki} (whole turns). Take z${sub(k)} = cis(${ang(th)}): each power adds ${ang(th)}` +
+            (done ? `. After ${n} powers the angle is ${n} × ${ang(th)} = ${ang(n * th)}: ${k === 1 ? "one full turn" : (k === 0 ? "no turn" : k + " full turns")}, back to <b class="cg">1</b>. ✓` : `. Watch where power ${n} lands.`);
+        }
+        case "all": return head + `So θ = 2π${ki}/${n}${n > 1 ? ", spaced " + gap + " apart" : ""}. ${ki} = 0${n > 1 ? ", 1, ..., " + (n - 1) : ""} give ${n} different point${n > 1 ? "s" : ""}. ${ki} = ${n} gives 2π, the same point as ${ki} = 0, so the roots start repeating.`;
+        case "polygon":
+          if (n === 1) return head + `One root: the single point 1.`;
+          if (n === 2) return head + `Two roots, 1 and −1: the two ends of a diameter, π apart.`;
+          return head + `Same radius 1, same angle ${gap} between neighbours, same side: the ${n} roots are the corners of a regular ${n}-gon with one corner at 1.`;
+        case "conj": {
+          const real = n % 2 === 0 ? "1 and −1" : "only 1";
+          const list = ["0"]; for (let j = 1; j < n / 2; j++) list.push("±" + ang(j * TAU / n)); if (n % 2 === 0 && n > 1) list.push("π");
+          return head + `Now use −π &lt; θ ≤ π: the angles are ${list.join(", ")}. The window −${ang(PI * n)} &lt; ${n === 1 ? "" : n}θ ≤ ${ang(PI * n)} is symmetric about 0, so the whole turns come as ±2π, ±4π, ...: θ and −θ together. cis θ and cis(−θ) are conjugates, mirror images in the real axis. Real roots: ${real}. (${zi}<sup>${n}</sup> − 1 has real coefficients, so non real roots come in conjugate pairs.)`;
+        }
+        case "formula": return head + `${ri}<sup>${ni}</sup> cis(${ni}θ) = 1 cis 0, so ${ri} = 1 and ${ni}θ = 2π${ki}. &nbsp;<b>${zi} = cis(2π${ki}/${ni}), &nbsp;${ki} = 0, 1, ..., ${ni} − 1</b> (0 ≤ ${ni}θ &lt; 2${ni}π holds exactly ${ni} whole turns). &nbsp;In −π &lt; θ ≤ π use ${ki} = 0, ±1, ±2, ...`;
+      }
+    } else {
+      const rS = rStr(M), rShort = rStr(M, true, false), w0 = ang(M.omega), th0 = M.roots[0].th;
+      switch (id) {
+        case "question": return head + `Solve ${zi}<sup>${n}</sup> = ${wi}, where ${wi} = ${cart(M.w)} = ${rhoStr(M)} cis(${w0}) (θ in ${rangeTxt}). Write ${zi} = ${ri} cis θ.`;
+        case "lengths": return head + `De Moivre: ${ri}<sup>${n}</sup> cis(${n}θ) = ${rhoStr(M)} cis(${w0}). Lengths: ${ri}<sup>${n}</sup> = ${rhoStr(M)}, so ${ri} = ${rS}. Every root lies on this circle.`;
+        case "window": return head + windowCaption(M);
+        case "walk": {
+          const done = S.walk && S.walk.t >= n;
+          return head + `Angles: ${n}θ = ${w0} + 2π${ki}. ${ki} = 0 gives θ = ${w0}/${n} = ${ang(th0)}: z₀ = ${cisStr(M.r1, rShort, th0)} = ${cart(M.roots[0].z)}.` +
+            (done ? ` After ${n} powers the angle is ${ang(n * th0)}: pointing along ${wi}, and the length is ${ri}<sup>${n}</sup> = ${rhoStr(M)}. ✓` : ` Each power adds ${ang(th0)} (and multiplies the length by ${ri}).`);
+        }
+        case "all": return head + `θ = (${w0} + 2π${ki})/${n}: each next root is 2π/${n} = ${gap} further round. ${ki} = 0, ..., ${n - 1} give ${n} roots; ${ki} = ${n} lands back on z₀.`;
+        case "turn": return head + `Every root is z₀ times a root of 1: take the regular ${n}-gon of the roots of 1, turn it by ${ang(th0)} and stretch it by ${rShort}. (Multiplying turns and stretches the plane.)`;
+        case "conj":
+          if (M.wReal) return head + `${wi} is real, so ω = ${ang(inRange(arg(M.w), "pm"))} and the values ${n}θ = ω + 2π${ki} in −${ang(PI * n)} &lt; ${n}θ ≤ ${ang(PI * n)} are symmetric about 0: θ and −θ come together. So the roots pair up as conjugates, mirror images in the real axis, just like ${zi}<sup>${n}</sup> = 1 (${zi}<sup>${n}</sup> − ${wi} has real coefficients).`;
+          return head + `${wi} is not real: ω = ${ang(inRange(arg(M.w), "pm"))}, so the values ${n}θ = ω + 2π${ki} are not symmetric about 0 and the roots are <b>not</b> conjugate pairs: the hollow mirror images are not roots. They solve ${zi}<sup>${n}</sup> = ${wi}* = ${cart(conj(M.w))} instead.`;
+        case "formula": return head + `${ri}<sup>${ni}</sup> cis(${ni}θ) = ρ cis ω, so ${ri} = <sup>${ni}</sup>√ρ and ${ni}θ = ω + 2π${ki}. &nbsp;<b>${zi} = <sup>${ni}</sup>√ρ cis((ω + 2π${ki})/${ni}), &nbsp;${ki} = 0, 1, ..., ${ni} − 1.</b> &nbsp;Here: ${ri} = ${rShort}, θ = ${ang(th0)} + ${ki} × ${gap}.`;
+      }
+    }
+    return "";
+  }
+
+  // ---------- side panel ----------
+  function renderN() {
+    const box = $("nrow"); box.innerHTML = "";
+    for (let n = 1; n <= 8; n++) {
+      const b = document.createElement("button"); b.textContent = n; b.className = n === S.n ? "on" : "";
+      b.title = "n = " + n + " (key " + n + ")";
+      b.onclick = () => setN(n); box.appendChild(b);
+    }
+  }
+  function renderPresets() {
+    const box = $("presets"); box.innerHTML = "";
+    PRESETS.forEach((p, i) => {
+      const b = document.createElement("button"); b.textContent = p.name;
+      b.className = (!S.custom && S.preset === i) ? "on" : "";
+      b.onclick = () => loadPreset(i); box.appendChild(b);
+    });
+  }
+  function setTry() {
+    let t;
+    if (S.mode === "unity") t = tryUnity(S.n);
+    else if (!S.custom && PRESETS[S.preset].n === S.n) t = PRESETS[S.preset];
+    else t = { q: `Predict before stepping: the radius ${ri}, the angle of z₀, and the gap between neighbouring roots.`,
+               a: (() => { const M = model(); return `${ri} = ${rStr(M)}, z₀ at θ = ${ang(M.roots[0].th)}, gap 2π/${M.n} = ${ang(TAU / M.n)}.`; })() };
+    $("tryQ").innerHTML = t.q; $("tryA").innerHTML = t.a;
+    $("tryA").classList.remove("show"); $("showAns").textContent = "Show answer";
+  }
+  function syncInputs() {
+    $("wa").value = Math.round(S.w.re * 1000) / 1000;
+    $("wb").value = Math.round(S.w.im * 1000) / 1000;
+    $("wr").value = Math.round(abs(S.w) * 1000) / 1000;
+    $("wt").value = Math.round(inRange(arg(S.w), S.range) * 180 / PI * 100) / 100;
+  }
+  function renderTable() {
+    const M = model();
+    const rows = M.roots.map(rt => {
+      const t02 = inRange(rt.th, "02"), tpm = inRange(rt.th, "pm");
+      return `<tr><td class="kc" style="color:${col(rt.k)}">${rt.k}</td><td>${ang(t02)}</td><td>${ang(tpm)}</td><td>${cart(rt.z)}</td></tr>`;
+    }).join("");
+    $("rootTable").innerHTML = `<tr><th>${ki}</th><th>θ in [0, 2π)</th><th>θ in (−π, π]</th><th>${zi} = <i class="m">a</i> + <i class="m">bi</i></th></tr>` + rows;
+    let ro;
+    if (S.mode === "unity") ro = `<span class="k">equation</span> ${zi}<sup>${M.n}</sup> = 1<br><span class="k">radius</span> ${ri} = 1<br><span class="k">angles</span> θ = 2π${ki}/${M.n}, gap ${ang(TAU / M.n)}`;
+    else ro = `<span class="k">equation</span> ${zi}<sup>${M.n}</sup> = ${cart(M.w)}<br><span class="k">${wi}</span> = ${rhoStr(M)} cis(${ang(M.omega)})<br><span class="k">radius</span> ${ri} = ${rStr(M)}<br><span class="k">angles</span> θ = ${ang(M.roots[0].th)} + ${ki} × ${ang(TAU / M.n)}`;
+    $("readout").innerHTML = ro;
+    $("tableNote").innerHTML = `${ki} counts from θ = (ω + 2π${ki})/${ni} with ω = arg ${S.mode === "unity" ? "1 = 0" : wi + " in " + (S.range === "02" ? "0 ≤ θ &lt; 2π" : "−π &lt; θ ≤ π")}. Changing the range can rename the roots (which one is ${ki} = 0), never move them.`;
+  }
+  function renderDots() {
+    const box = $("dots"); box.innerHTML = "";
+    for (let i = 0; i < nSteps(); i++) {
+      const d = document.createElement("button"); d.className = "dot" + (i === S.step ? " on" : "");
+      d.title = (i + 1) + ". " + STEP_NAMES[S.mode][STEPS[S.mode][i]]; d.setAttribute("aria-label", d.title);
+      d.onclick = () => goStep(i); box.appendChild(d);
+    }
+    $("back").disabled = S.step === 0; $("next").disabled = S.step === nSteps() - 1;
+  }
+  function refresh() {
+    renderN(); renderPresets(); renderTable(); renderDots(); fit(false);
+    $("anyBox").style.display = S.mode === "any" ? "" : "none";
+    $("tabUnity").className = S.mode === "unity" ? "on" : ""; $("tabAny").className = S.mode === "any" ? "on" : "";
+  }
+
+  // ---------- actions ----------
+  function startWalk(k) {
+    const M = model(); if (k == null) k = S.sel; if (k >= M.n) k = 0;
+    S.sel = k; S.walk = { k, t: reduceMotion ? M.n : 0 };
+  }
+  function defaultSel() { return S.mode === "unity" && S.n > 1 ? 1 : 0; }
+  function goStep(i) {
+    S.step = Math.max(0, Math.min(nSteps() - 1, i)); S.stepT = reduceMotion ? 1 : 0;
+    S.walk = null;
+    if (sid() === "walk") { S.sel = defaultSel(); startWalk(S.sel); }
+    refresh();
+  }
+  const next = () => { if (S.step < nSteps() - 1) goStep(S.step + 1); };
+  const back = () => { if (S.step > 0) goStep(S.step - 1); };
+  function setN(n) {
+    S.n = n; S.custom = S.mode === "any" ? true : S.custom;
+    if (S.mode === "any" && PRESETS[S.preset].n === n && !S.customW) S.custom = false;
+    S.stepT = reduceMotion ? 1 : 0; S.walk = null;
+    if (sid() === "walk") { S.sel = defaultSel(); startWalk(S.sel); }
+    setTry(); refresh();
+  }
+  function setMode(m) {
+    if (S.mode === m) return;
+    S.mode = m;
+    if (m === "any" && !S.custom) { S.n = PRESETS[S.preset].n; S.w = PRESETS[S.preset].w; }
+    setTry(); goStep(0); syncInputs();
+  }
+  function loadPreset(i) {
+    S.preset = i; S.custom = false; S.customW = false; S.n = PRESETS[i].n; S.w = PRESETS[i].w;
+    syncInputs(); setTry(); goStep(0);
+  }
+  function setW(w, keepInputs) {
+    if (abs(w) < 1e-6) return;
+    S.w = w; S.custom = true; S.customW = true; S.walk = null;
+    if (sid() === "walk") startWalk(0);
+    if (!keepInputs) syncInputs();
+    setTry(); refresh();
+  }
+
+  // ---------- events ----------
+  $("next").onclick = next; $("back").onclick = back;
+  $("tabUnity").onclick = () => setMode("unity"); $("tabAny").onclick = () => setMode("any");
+  $("showAns").onclick = () => { const a = $("tryA"); a.classList.toggle("show"); $("showAns").textContent = a.classList.contains("show") ? "Hide answer" : "Show answer"; };
+  $("range").onchange = e => { S.range = e.target.value; S.walk = null; if (sid() === "walk") startWalk(S.sel); syncInputs(); setTry(); refresh(); };
+  $("showLabels").onchange = e => { S.labels = e.target.checked; };
+  $("snap").onchange = e => { S.snap = e.target.checked; };
+  const readCart = () => { const a = parseFloat($("wa").value), b = parseFloat($("wb").value); if (isFinite(a) && isFinite(b)) setW(C(a, b), true); syncPolarOnly(); };
+  const readPolar = () => { const r = parseFloat($("wr").value), t = parseFloat($("wt").value); if (isFinite(r) && r > 0 && isFinite(t)) { setW(fromPolar(r, t * PI / 180), true); $("wa").value = Math.round(S.w.re * 1000) / 1000; $("wb").value = Math.round(S.w.im * 1000) / 1000; } };
+  function syncPolarOnly() { $("wr").value = Math.round(abs(S.w) * 1000) / 1000; $("wt").value = Math.round(inRange(arg(S.w), S.range) * 180 / PI * 100) / 100; }
+  ["wa", "wb"].forEach(id => $(id).addEventListener("change", readCart));
+  ["wr", "wt"].forEach(id => $(id).addEventListener("change", readPolar));
+
+  function pick(x, y) {
+    const M = model();
+    if (after("walk")) {
+      const list = sid() === "walk" ? [M.roots[S.walk ? S.walk.k : S.sel]] : M.roots;
+      for (const rt of list) { if (!rt) continue; const s = toS(rt.z); if (Math.hypot(s.x - x, s.y - y) < 16) return { type: "root", k: rt.k }; }
+    }
+    if (S.mode === "any") { const s = toS(M.w); if (Math.hypot(s.x - x, s.y - y) < 18) return { type: "w" }; }
+    return null;
+  }
+  cv.addEventListener("pointerdown", e => {
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, h = pick(x, y);
+    if (!h) return;
+    if (h.type === "root") { startWalk(h.k); return; }
+    S.drag = true; S.frozen = true; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", e => {
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (S.drag) {
+      let p = toW(x, y); if (S.snap) p = C(Math.round(p.re), Math.round(p.im));
+      if (abs(p) > 0.5 && (p.re !== S.w.re || p.im !== S.w.im)) setW(p);
+    } else cv.style.cursor = pick(x, y) ? "pointer" : "default";
+  });
+  const endDrag = () => { if (S.drag) { S.drag = false; S.frozen = false; fit(false); } };
+  cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === " " || k === "arrowright") { e.preventDefault(); next(); }
+    else if (k === "arrowleft") { e.preventDefault(); back(); }
+    else if (k >= "1" && k <= "8") setN(+k);
+    else if (k === "u") setMode("unity");
+    else if (k === "w") setMode("any");
+    else if (k === "p") { if (!after("walk")) goStep(stepIdx("walk")); else startWalk(S.sel); }
+    else if (k === "l") { S.range = S.range === "02" ? "pm" : "02"; $("range").value = S.range; $("range").onchange({ target: $("range") }); }
+    else if (k === "r") goStep(0);
+    else if (k === "f") { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); }
+  });
+  window.addEventListener("resize", resize);
+
+  // ---------- animation loop ----------
+  let last = performance.now(), lastCap = "";
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const M = model();
+    if (S.stepT < 1) S.stepT = Math.min(1, S.stepT + dt / (sid() === "all" ? 0.6 * (M.n + 1) : sid() === "window" ? windowSeconds(M.n) : 1.1));
+    if (S.walk && S.walk.t < M.n) S.walk.t = Math.min(M.n, S.walk.t + dt / 0.85);
+    if (!S.frozen) S.scale += (S.targetScale - S.scale) * Math.min(1, dt * 7);
+    draw();
+    const cap = caption();
+    if (cap !== lastCap) { $("captionText").innerHTML = cap; lastCap = cap; fit(false); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- start ----------
+  window.__roots = { S, model, caption, ang, cart, surd, rStr, inRange, kIn, goStep, setN, setMode, loadPreset, setW, startWalk, PRESETS };
+  $("range").value = S.range;
+  syncInputs(); setTry(); resize(); goStep(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
